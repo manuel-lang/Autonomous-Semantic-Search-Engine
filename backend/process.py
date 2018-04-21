@@ -322,13 +322,13 @@ def create_pdf_images(input_pdf, output_path):
         with open(file_path, "wb") as jpgfile:
             jpgfile.write(jpg)
 
-        img = Image.open(file_path)
-        size = img.size
-        if size[0] < 100 or size[1] < 100:
-            os.remove(file_path)
-        else:
-            export_paths.append(file_path)
-            njpg += 1
+        #img = Image.open(file_path)
+        #size = img.size
+        #if size[0] < 100 or size[1] < 100:
+        #    os.remove(file_path)
+        #else:
+        export_paths.append(file_path)
+        njpg += 1
 
         i = iend
 
