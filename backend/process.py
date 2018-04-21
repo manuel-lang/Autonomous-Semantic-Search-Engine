@@ -220,11 +220,6 @@ def map_entities(entities):
         out.append((val['type'], val['text'], val['relevance']))
     return out
 
-def map_entites_with_pictures(entities):
-    out = []
-    for val in entities:
-        out.append((val[0], val[1], val[2], ))
-    return out
 
 def process_keywords(keywords):
     out = []
@@ -235,8 +230,7 @@ def process_keywords(keywords):
 def process_entities(entities):
     mapped_entites = map_entities(entities)# type : 'type', text: 'text', relevance: 'relevance' to (type, text relevance)
     filtered_entities = filter_entities( mapped_entites)
-    final_entities = map_entites_with_pictures(filtered_entities)
-    return final_entities
+    return filtered_entities
 
 def get_title_from_meta(input_pdf):
     title = PdfReader(input_pdf).Info.Title
