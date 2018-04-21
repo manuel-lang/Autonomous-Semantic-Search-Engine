@@ -16,6 +16,9 @@ watson-developer-cloud = "*"
 textract = "*"
 gensim = "*"
 nltk = "*"
+fitz = "*"
+"pypdf2" = "*"
+wand = "*"
 
 
 [requires]
