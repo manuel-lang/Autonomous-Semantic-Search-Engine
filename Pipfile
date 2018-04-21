@@ -19,6 +19,8 @@ nltk = "*"
 fitz = "*"
 "pypdf2" = "*"
 wand = "*"
+"pdfminer.six" = "*"
+pdfrw = "*"
 
 
 [requires]
