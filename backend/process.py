@@ -357,8 +357,7 @@ def getVectorsOf(model, text):
             pass
     return vectors
 
-def vectorize_document(text):
-    model = api.load("glove-wiki-gigaword-300")  # download the model and return as object ready for use
+def vectorize_document(text, model):
     return np.array(getVectorsOf(model, text)).mean(axis=0)
 
 def mongo_connect():
@@ -394,7 +393,15 @@ def main(entity_limit = 50, keyword_limit = 20):
         document_type_classifier = pickle.load(f)
     with open('../notebooks/url_features.pkl', 'rb') as f:
         url_features = pickle.load(f)
-    for index, pdffile in enumerate(sorted(os.listdir('nextiterationhackathon2018/pdf'))[39:]):
+
+    model = api.load("glove-wiki-gigaword-300")  # download the model and return as object ready for use
+
+    natural_language_understanding = NaturalLanguageUnderstandingV1(
+        username='cccb5076-87bd-4992-b99e-29a0f258460b',
+        password='Prop61GOuNtl',
+        version='2018-03-16')
+
+    for index, pdffile in enumerate(sorted(os.listdir('nextiterationhackathon2018/pdf'))):
         try:
             print("Durchlauf " + str(index))
             if(pdffile.endswith(".json")):
@@ -423,11 +430,6 @@ def main(entity_limit = 50, keyword_limit = 20):
 
 
             #process entities and keywords
-            natural_language_understanding = NaturalLanguageUnderstandingV1(
-              username='cccb5076-87bd-4992-b99e-29a0f258460b',
-              password='Prop61GOuNtl',
-              version='2018-03-16')
-
             response = natural_language_understanding.analyze(
             text=document['text'],
             features=Features(
@@ -470,8 +472,6 @@ def main(entity_limit = 50, keyword_limit = 20):
             document['lingvector'] = x_ling[0]
             ling_features = pd.DataFrame(x_ling, columns=ling.get_feature_names())
 
-            model = api.load("glove-wiki-gigaword-300")  # download the model and return as object ready for use
-
             w2v_features = pd.DataFrame([np.array(getVectorsOf(model, document["text"])).mean(axis=0)]).add_prefix("w2v_")
             features = pd.concat([generated_url_features, ling_features, w2v_features], axis=1)
 
@@ -490,7 +490,7 @@ def main(entity_limit = 50, keyword_limit = 20):
 
             print("Vector start")
 
-            document['vector_representation'] = vectorize_document(document['text'])
+            document['vector_representation'] = vectorize_document(document['text'], model)
 
             print("Summary start")
             document['summary'] = summarize(document['text'].replace('\n', ' '), word_count=100, split=False)
