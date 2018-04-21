@@ -393,26 +393,27 @@ def mongo_connect():
     return documents
 
 def mongo_save(document, schema):
-    document = {"document_title": document['title'],
+    doc = {"document_title": document['title'],
          "document_summary": document['summary'],
          "thumbnail_path": document['thumbnail_path'],
          "extracted_image_paths": document['pdf_images_paths'],
-         "document_url": "/path/to/document",
-         "document_parent_url": "/path/to/parent",
+         "document_url": document['url'],
+         "document_parent_url": document['parent_url'],
          "document_type": "paper",
          "filename": "Hyper dyper AI paper",
-         "keywords": [("mongodb", 0.71), ("python", 0.75), ("pymongo", 0.93)], # word, score
-         "entities": [("Person", "Andrew Ng", 0.93, "/path/to/ng.png"), ("Location", "Cupertino", 0.34, "/path/to/cupertino.png"), ("Organization", "Stanford University", 0.87, "/path/to/stanford.png")], # entity, value, score, image
+         "keywords": document['keywords'], # word, score
+         "entities": document['entities'], # entity, value, score, image
          "date": datetime.datetime.now()}
-    schema.insert_one(document) # FATAAAAAL
+    schema.insert_one(doc)
 
 def main(entity_limit = 50, keyword_limit = 20):
     schema = mongo_connect()
-    with open('notebooks/document_type_classifier.pkl', 'rb') as f:
+    with open('../notebooks/document_type_classifier.pkl', 'rb') as f:
         document_type_classifier = pickle.load(f)
-    with open('notebooks/url_features.pkl') as f:
+    with open('../notebooks/url_features.pkl', 'rb') as f:
         url_features = pickle.load(f)
     for index, pdffile in enumerate(os.listdir('nextiterationhackathon2018/pdf')):
+        if(pdffile.endswith(".json")): break
         pdfpath = os.path.join('nextiterationhackathon2018/pdf', pdffile)
         document = {}
         # process raw text
@@ -453,20 +454,20 @@ def main(entity_limit = 50, keyword_limit = 20):
         if document['title'] == None: return
 
         # document classification
-        x = []
-        try:
-            x.append({
-                "tld-url": '.'.join(tldextract.extract(document['url'])[:2]),
-                "tld-parent-url": '.'.join(tldextract.extract(document['parent_url'])[:2])
-            })
-        except Exception as e:
-            print(str(e))
-            pass
+        #x = []
+        #try:
+        #    x.append({
+        #        "tld-url": '.'.join(tldextract.extract(document['url'])[:2]),
+        #        "tld-parent-url": '.'.join(tldextract.extract(document['parent_url'])[:2])
+        #    })
+        #except Exception as e:
+        #    print(str(e))
+        #    pass
 
-        ling = LinguisticVectorizer();
-        x_ling = ling.fit([document['text']]).transform([document['text']])
-        url_features = pd.get_dummies(pd.DataFrame(x))
-        url_features.head()
+        #ling = LinguisticVectorizer();
+        #x_ling = ling.fit([document['text']]).transform([document['text']])
+        #url_features = pd.get_dummies(pd.DataFrame(x))
+        #url_features.head()
 
         # document images
         outpath = os.path.join("out", str(index))
