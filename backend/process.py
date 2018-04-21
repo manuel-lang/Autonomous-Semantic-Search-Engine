@@ -15,6 +15,7 @@ import sys
 import pdfrw
 import textract
 import tldextract
+import traceback
 
 from collections import Counter
 from nltk import pos_tag
@@ -89,37 +90,23 @@ class LinguisticVectorizer(BaseEstimator):
             word_length_list.append(len(word))
         return np.average(word_length_list)
 
-    def _get_number_of_nouns(self, string):
-        nouns = [a[0] for a in pos_tag(self.__filter(string)) if a[1] in ['NN', 'NNS', 'NNP', 'NNPS']]
-        return len(nouns) / self._get_text_length(string)
-
-    def _get_number_of_adjectives(self, string):
-        adjectives = [a[0] for a in pos_tag(self.__filter(string)) if a[1] in ['JJ', 'JJR', 'JJS']]
-        return len(adjectives) / self._get_text_length(string)
-
-    def _get_number_of_verbs(self, string):
-        verbs = [a[0] for a in pos_tag(self.__filter(string)) if a[1] in ['VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ']]
-        return len(verbs) / self._get_text_length(string)
+    def _get_number_of_pos(self, string):
+        nouns = 0
+        verbs = 0
+        adj = 0
+        for a in pos_tag(self.__filter(string)):
+            if a[1] in ['NN', 'NNS', 'NNP', 'NNPS']: nouns += 1
+            if a[1] in ['JJ', 'JJR', 'JJS']: adj += 1
+            if a[1] in ['VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ']: verbs += 1
+        length = self._get_text_length(string)
+        return (nouns/length, verbs/length, adj/length, verbs / (adj + verbs))
+        # n, v, a, naq
 
     def _get_ttr(self, string):
         tokens = self.__filter(string)
         if len(tokens) is 0:
             return 0
         return len(set(tokens)) / len(tokens)
-
-    def _get_aq(self, string):
-        adjectives = self._get_number_of_adjectives(string)
-        verbs = self._get_number_of_verbs(string)
-        if adjectives is 0:
-            return verbs
-        return verbs / adjectives
-
-    def _get_naq(self, string):
-        adjectives = self._get_number_of_adjectives(string)
-        verbs = self._get_number_of_verbs(string)
-        if adjectives is 0 and verbs is 0:
-            return 0
-        return verbs / (adjectives + verbs)
 
     def _get_hl(self, string):
         words = self.__filter(string)
@@ -170,12 +157,9 @@ class LinguisticVectorizer(BaseEstimator):
         number_of_paragraphs = [self._get_number_of_paragraphs(d) for d in documents]
         average_length_of_sent = [self._get_average_sent_length(d) for d in documents]
         average_word_length = [self._get_average_word_length(d) for d in documents]
-        number_of_nouns = [self._get_number_of_nouns(d) for d in documents]
-        number_of_adjectives = [self._get_number_of_adjectives(d) for d in documents]
-        number_of_verbs = [self._get_number_of_verbs(d) for d in documents]
+        number_of_nouns, number_of_verbs, number_of_adjectives, action_index = self._get_number_of_pos(documents[0])
         type_token_relation = [self._get_ttr(d) for d in documents]
         hapaxes_index = [self._get_hl(d) for d in documents]
-        action_index = [self._get_naq(d) for d in documents]
         number_of_question_marks = [self._get_number_of_symbol(d, "?") for d in documents]
         number_of_exclamations = [self._get_number_of_symbol(d, "!") for d in documents]
         number_of_percentages = [self._get_number_of_symbol(d, "%") for d in documents]
@@ -190,12 +174,12 @@ class LinguisticVectorizer(BaseEstimator):
              number_of_paragraphs,
              average_length_of_sent,
              average_word_length,
-             number_of_nouns,
-             number_of_adjectives,
-             number_of_verbs,
+             [number_of_nouns],
+             [number_of_adjectives],
+             [number_of_verbs],
              type_token_relation,
              hapaxes_index,
-             action_index,
+             [action_index],
              number_of_question_marks,
              number_of_exclamations,
              number_of_percentages,
@@ -410,7 +394,7 @@ def main(entity_limit = 50, keyword_limit = 20):
         document_type_classifier = pickle.load(f)
     with open('../notebooks/url_features.pkl', 'rb') as f:
         url_features = pickle.load(f)
-    for index, pdffile in enumerate(sorted(os.listdir('nextiterationhackathon2018/pdf'))):
+    for index, pdffile in enumerate(sorted(os.listdir('nextiterationhackathon2018/pdf'))[39:]):
         try:
             print("Durchlauf " + str(index))
             if(pdffile.endswith(".json")):
@@ -515,6 +499,7 @@ def main(entity_limit = 50, keyword_limit = 20):
             mongo_save(document, schema)
         except Exception as e:
             print("EXCEPTION" + str(e))
+            traceback.print_tb(e.__traceback__)
             continue
 
 if __name__ == "__main__":
