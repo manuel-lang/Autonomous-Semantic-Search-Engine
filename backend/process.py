@@ -1,50 +1,249 @@
+import datetime
 import gensim.downloader as api
 import io
-import os
-
 import json
-import textract
-import pdfminer
 import math
-import numpy as np
-
-import sys
-import PyPDF2
 import nltk
-from nltk.tokenize import wordpunct_tokenize
+import numpy as np
+import os
+import pandas as pd
+import pdfminer
+import pickle
+import PyPDF2
+import re
+import sys
+import textract
+
+from collections import Counter
+from nltk import pos_tag
+from nltk.corpus import stopwords
+from nltk.tokenize import sent_tokenize, word_tokenize, wordpunct_tokenize
 from gensim.summarization.summarizer import summarize
-from pdfrw import PdfReader
-from pdfminer.pdfparser import PDFParser
+from os.path import basename
+from pdfminer.converter import PDFPageAggregator
+from pdfminer.layout import LAParams
 from pdfminer.pdfdocument import PDFDocument
-from pdfminer.pdfpage import PDFPage
 from pdfminer.pdfinterp import PDFResourceManager
 from pdfminer.pdfinterp import PDFPageInterpreter
-from pdfminer.layout import LAParams
-from pdfminer.converter import PDFPageAggregator
+from pdfminer.pdfpage import PDFPage
+from pdfminer.pdfparser import PDFParser
+from pdfrw import PdfReader
+from pymongo import MongoClient
+from sklearn.base import BaseEstimator
+from wand.image import Image
 from watson_developer_cloud import NaturalLanguageUnderstandingV1
 from watson_developer_cloud.natural_language_understanding_v1 import Features, KeywordsOptions, EntitiesOptions
 
-from wand.image import Image
 
-def filter_entities(inp = [("mongodb", 0.71), ("python", 0.75), ("pymongo", 0.93), ("Person", 0.72)], entity_filter = ["Person", "Location", "Organization", "Company"]):
-    out = []
-    for val in inp:
+def words(text): return re.findall(r'\w+', text.lower())
+
+class LinguisticVectorizer(BaseEstimator):
+
+    def get_feature_names(self):
+        return np.array(
+            ['text_length',
+             'number_of_paragraphs',
+             'average_sent_length',
+             'average_word_length',
+             'number_of_nouns',
+             'number_of_adjectives',
+             'number_of_verbs',
+             'type_token_relation',
+             'hapaxes_index',
+             'action_index',
+             'number_of_question_marks',
+             'number_of_exclamations',
+             'number_of_percentages',
+             'number_of_currency_symbols',
+             'number_of_paragraph_symbols',
+             'content_fraction',
+             'number_of_cappsed_words',
+             'number_of_first_person_pronouns']
+        )
+
+    def fit(self, documents, y=None):
+        return self
+
+    def __filter(self, string):
+        return [w for w in word_tokenize(string) if w.isalpha()]
+
+    def _get_text_length(self, string):
+        tokens = self.__filter(string)
+        return len(tokens)
+
+    def _get_number_of_paragraphs(self, string):
+        return round(string.count('\n') / 2)
+
+    def _get_average_sent_length(self, string):
+        tokens = self.__filter(string)
+        if len(sent_tokenize(string)) is 0:
+            return len(tokens)
+        return len(tokens) / len(sent_tokenize(string))
+
+    def _get_average_word_length(self, string):
+        tokens = self.__filter(string)
+        word_length_list = []
+        for word in tokens:
+            word_length_list.append(len(word))
+        return np.average(word_length_list)
+
+    def _get_number_of_nouns(self, string):
+        nouns = [a[0] for a in pos_tag(self.__filter(string)) if a[1] in ['NN', 'NNS', 'NNP', 'NNPS']]
+        return len(nouns) / self._get_text_length(string)
+
+    def _get_number_of_adjectives(self, string):
+        adjectives = [a[0] for a in pos_tag(self.__filter(string)) if a[1] in ['JJ', 'JJR', 'JJS']]
+        return len(adjectives) / self._get_text_length(string)
+
+    def _get_number_of_verbs(self, string):
+        verbs = [a[0] for a in pos_tag(self.__filter(string)) if a[1] in ['VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ']]
+        return len(verbs) / self._get_text_length(string)
+
+    def _get_ttr(self, string):
+        tokens = self.__filter(string)
+        if len(tokens) is 0:
+            return 0
+        return len(set(tokens)) / len(tokens)
+
+    def _get_aq(self, string):
+        adjectives = self._get_number_of_adjectives(string)
+        verbs = self._get_number_of_verbs(string)
+        if adjectives is 0:
+            return verbs
+        return verbs / adjectives
+
+    def _get_naq(self, string):
+        adjectives = self._get_number_of_adjectives(string)
+        verbs = self._get_number_of_verbs(string)
+        if adjectives is 0 and verbs is 0:
+            return 0
+        return verbs / (adjectives + verbs)
+
+    def _get_hl(self, string):
+        words = self.__filter(string)
+        fdist = nltk.FreqDist(words)
+        hapaxes = fdist.hapaxes()
+        if len(words) is 0:
+            return len(hapaxes)
+        return len(hapaxes) / len(words)
+
+    def _get_number_of_spelling_mistakes(self, string):
+        text_vocub = set(w.lower() for w in word_tokenize(string) if w.isalpha())
+        text_dict  = set(w.lower() for w in dictionary)
+        return len(text_vocub - text_dict) / self._get_text_length(string)
+
+    def _get_number_of_currency_symbols(self, string):
+        currencies = ["£","€","$","¥","¢","₩"]
+        sum = 0
+        for currency in currencies:
+            sum += self._get_number_of_symbol(string, currency)
+        return sum / self._get_text_length(string)
+
+    def _get_number_of_symbol(self, string, symbol):
+        return string.count(symbol) / self._get_text_length(string)
+
+    def _get_content_fraction(self, string):
+        tokens = self.__filter(string)
+        content = [w for w in tokens if w.lower() not in stopwords.words('english')]
+        if len(tokens) is 0:
+            return 0
+        return len(content) / len(tokens)
+
+    def _get_number_of_cappsed_words(self, string):
+        tokens = self.__filter(string)
+        return np.sum([t.isupper() for t in tokens if len(t) > 2]) / self._get_text_length(string)
+
+    def _get_number_of_first_person_pronouns(self, string):
+        tokens = word_tokenize(string)
+        pronouns = ["i","me","my", "mine", "myself","we", "our", "ours", "ourself"]
+        sum = 0
+        mode = 0
+        for word in tokens:
+            if word == "``":
+                mode = mode + 1
+            elif word == "''":
+                mode = mode - 1
+
+            if mode <= 0 and word.lower() in '\t'.join(pronouns):
+                sum += 1
+        return sum / len(tokens)
+
+    def transform(self, documents):
+        text_length = [self._get_text_length(d) for d in documents]
+        number_of_paragraphs = [self._get_number_of_paragraphs(d) for d in documents]
+        print("---1")
+        average_length_of_sent = [self._get_average_sent_length(d) for d in documents]
+        average_word_length = [self._get_average_word_length(d) for d in documents]
+        print("---2")
+        number_of_nouns = [self._get_number_of_nouns(d) for d in documents]
+        number_of_adjectives = [self._get_number_of_adjectives(d) for d in documents]
+        number_of_verbs = [self._get_number_of_verbs(d) for d in documents]
+        print("---3")
+        type_token_relation = [self._get_ttr(d) for d in documents]
+        hapaxes_index = [self._get_hl(d) for d in documents]
+        action_index = [self._get_naq(d) for d in documents]
+        print("---4")
+        number_of_question_marks = [self._get_number_of_symbol(d, "?") for d in documents]
+        number_of_exclamations = [self._get_number_of_symbol(d, "!") for d in documents]
+        number_of_percentages = [self._get_number_of_symbol(d, "%") for d in documents]
+        number_of_currency_symbols = [self._get_number_of_currency_symbols(d) for d in documents]
+        number_of_paragraph_symbols = [self._get_number_of_symbol(d, "§") for d in documents]
+        content_fraction = [self._get_content_fraction(d) for d in documents]
+        number_of_cappsed_words = [self._get_number_of_cappsed_words(d) for d in documents]
+        number_of_first_person_pronouns = [self._get_number_of_first_person_pronouns(d) for d in documents]
+
+        result = np.array(
+            [text_length,
+             number_of_paragraphs,
+             average_length_of_sent,
+             average_word_length,
+             number_of_nouns,
+             number_of_adjectives,
+             number_of_verbs,
+             type_token_relation,
+             hapaxes_index,
+             action_index,
+             number_of_question_marks,
+             number_of_exclamations,
+             number_of_percentages,
+             number_of_currency_symbols,
+             number_of_paragraph_symbols,
+             content_fraction,
+             number_of_cappsed_words,
+             number_of_first_person_pronouns]
+        ).T
+
+        return result
+
+def filter_entities(entities_in, entity_filter = ["Person", "Location", "Organization", "Company"]):
+    entities_out = []
+    for val in entities_in:
         if val[0] in entity_filter:
-            out.append(val)
+            entities_out.append(val)
+    return entities_out
+
+def map_entities(entities):
+    out = []
+    for val in entities:
+        out.append((val['type'], val['text'], val['relevance']))
     return out
 
 def map_entites_with_pictures(entities):
-    # Jan Crawler
+    out = []
+    for val in entities:
+        out.append((val[0], val[1], val[2], ))
     pass
 
 def process_keywords(keywords):
-    # text : 'text', relevance : score to (text, score)
-    pass
+    out = []
+    for val in keywords:
+        out.append((val['text'], val['relevance']))
+    return out
 
 def process_entities(entities):
-    mapped_entites = []# type : 'type', text: 'text', relevance: 'relevance' to (type, text relevance)
-    filtered_entities = filter_entities(inp = mapped_entites)
-    final_entities = map_entites_with_pictures()
+    mapped_entites = map_entities(entities)# type : 'type', text: 'text', relevance: 'relevance' to (type, text relevance)
+    filtered_entities = filter_entities( mapped_entites)
+    final_entities = map_entites_with_pictures(filtered_entities)
     return final_entities
 
 def get_title_from_meta(input_pdf):
@@ -149,18 +348,18 @@ def create_pdf_images(input_pdf, output_path):
         print("JPG %d from %d to %d" % (njpg, istart, iend))
         jpg = pdf[istart:iend]
         file_path = os.path.join(output_path, "jpg%d.jpg" % njpg)
-        jpgfile = open(file_path, "wb")
-        jpgfile.write(jpg)
-        jpgfile.close()
+        os.makedirs(output_path, exist_ok = True)
+        with open(file_path, "wb") as jpgfile:
+            jpgfile.write(jpg)
 
-        export_path.append(file_path)
+        export_paths.append(file_path)
 
         njpg += 1
         i = iend
 
     return export_paths
 
-def create_thumbnail(src_filename, pagenum = 0, resolution = 72,):
+def create_thumbnail(src_filename, output_path, pagenum = 0, resolution = 72,):
     src_pdf = PyPDF2.PdfFileReader(open(src_filename, "rb"))
     dst_pdf = PyPDF2.PdfFileWriter()
     dst_pdf.addPage(src_pdf.getPage(pagenum))
@@ -169,7 +368,7 @@ def create_thumbnail(src_filename, pagenum = 0, resolution = 72,):
     pdf_bytes.seek(0)
     img = Image(file = pdf_bytes, resolution = resolution)
     img.convert("png")
-    export_path = src_filename + "_thumb.png"
+    export_path = output_path + "_thumb.png"
     img.save(filename = export_path)
     return export_path
 
@@ -194,20 +393,39 @@ def mongo_connect():
     return documents
 
 def mongo_save(document, schema):
-    schema.insert_one(document)
+    document = {"document_title": document['title'],
+         "document_summary": document['summary'],
+         "thumbnail_path": document['thumbnail_path'],
+         "extracted_image_paths": document['pdf_images_paths'],
+         "document_url": "/path/to/document",
+         "document_parent_url": "/path/to/parent",
+         "document_type": "paper",
+         "filename": "Hyper dyper AI paper",
+         "keywords": [("mongodb", 0.71), ("python", 0.75), ("pymongo", 0.93)], # word, score
+         "entities": [("Person", "Andrew Ng", 0.93, "/path/to/ng.png"), ("Location", "Cupertino", 0.34, "/path/to/cupertino.png"), ("Organization", "Stanford University", 0.87, "/path/to/stanford.png")], # entity, value, score, image
+         "date": datetime.datetime.now()}
+    schema.insert_one(document) # FATAAAAAL
 
 def main(entity_limit = 50, keyword_limit = 20):
     schema = mongo_connect()
-    for pdffile, index in os.listdir('nextiterationhackathon2018/pdf'):
+    with open('notebooks/document_type_classifier.pkl', 'rb') as f:
+        document_type_classifier = pickle.load(f)
+    with open('notebooks/url_features.pkl') as f:
+        url_features = pickle.load(f)
+    for index, pdffile in enumerate(os.listdir('nextiterationhackathon2018/pdf')):
+        pdfpath = os.path.join('nextiterationhackathon2018/pdf', pdffile)
         document = {}
-        document.text = textract.process("nextiterationhackathon2018/pdf/Waechter2018.pdf").decode("utf-8")
+        # process raw text
+        document['text'] = textract.process("nextiterationhackathon2018/pdf/Waechter2018.pdf").decode("utf-8")
+
+        #process entities and keywords
         natural_language_understanding = NaturalLanguageUnderstandingV1(
           username='cccb5076-87bd-4992-b99e-29a0f258460b',
           password='Prop61GOuNtl',
           version='2018-03-16')
 
         response = natural_language_understanding.analyze(
-        text=text,
+        text=document['text'],
         features=Features(
             entities=EntitiesOptions(
              sentiment=False,
@@ -218,18 +436,45 @@ def main(entity_limit = 50, keyword_limit = 20):
               limit=keyword_limit)))
 
         keywords = response['keywords']
-        document.keywords = process_keywords(keywords)
+        document['keywords'] = process_keywords(keywords)
         entities = response['entities']
-        document.entities = process_entities(entities)
-        if get_title_from_meta(pdffile) == None: document.title = get_title_without_meta(pdffile)
-        else: document.title = get_title_from_meta(pdffile)
-        if title == None: return
-        outpath = os.path.join("out", index)
-        document.pdf_images_paths = create_pdf_images(pdffile, os.path.join(outpath, "docimages"))
-        document.thumbnail_path = create_thumbnail(pdffile, os.path.join(outpath, "thumbnail"))
-        document.vector_representation = vectorize_document(text)
-        document.summary = summarize(text.replace('\n', ' '), word_count=100, split=False)
+        document['entities'] = process_entities(entities)
+
+        # add metadata
+        json_path = os.path.join('nextiterationhackathon2018/pdf', basename(pdffile) + '.json')
+        with open(json_path, 'r+') as jsondata:
+            metadata = json.load(jsondata)
+            document['url'] = metadata['url']
+            document['parent_url'] = metadata['parent_url']
+
+        # document title
+        if get_title_from_meta(pdfpath) == None: document['title'] = get_title_without_meta(pdfpath)
+        else: document['title'] = get_title_from_meta(pdfpath)
+        if document['title'] == None: return
+
+        # document classification
+        x = []
+        try:
+            x.append({
+                "tld-url": '.'.join(tldextract.extract(document['url'])[:2]),
+                "tld-parent-url": '.'.join(tldextract.extract(document['parent_url'])[:2])
+            })
+        except Exception as e:
+            print(str(e))
+            pass
+
+        ling = LinguisticVectorizer();
+        x_ling = ling.fit([document['text']]).transform([document['text']])
+        url_features = pd.get_dummies(pd.DataFrame(x))
+        url_features.head()
+
+        # document images
+        outpath = os.path.join("out", str(index))
+        document['pdf_images_paths'] = create_pdf_images(pdfpath, os.path.join(outpath, "docimages"))
+        document['thumbnail_path'] = create_thumbnail(pdfpath, os.path.join(outpath, "thumbnail"))
+        document['vector_representation'] = vectorize_document(document['text'])
+        document['summary'] = summarize(document['text'].replace('\n', ' '), word_count=100, split=False)
         mongo_save(document, schema)
 
-if __name__ == __main__:
+if __name__ == "__main__":
     main()
