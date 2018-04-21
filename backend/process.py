@@ -224,7 +224,7 @@ def map_entites_with_pictures(entities):
     out = []
     for val in entities:
         out.append((val[0], val[1], val[2], ))
-    pass
+    return out
 
 def process_keywords(keywords):
     out = []
@@ -413,8 +413,16 @@ def main(entity_limit = 50, keyword_limit = 20):
         url_features = pickle.load(f)
     for index, pdffile in enumerate(os.listdir('nextiterationhackathon2018/pdf')):
         if(pdffile.endswith(".json")): continue
+
         pdfpath = os.path.join('nextiterationhackathon2018/pdf', pdffile)
         document = {}
+
+        # document title
+        if get_title_from_meta(pdfpath) == None: document['title'] = get_title_without_meta(pdfpath)
+        else: document['title'] = get_title_from_meta(pdfpath)
+        if document['title'] == None:
+            print("Could not find title")
+            continue
         document['time'] = os.path.getmtime(pdfpath)
         # process raw text
         document['text'] = textract.process("nextiterationhackathon2018/pdf/Waechter2018.pdf").decode("utf-8")
@@ -448,11 +456,6 @@ def main(entity_limit = 50, keyword_limit = 20):
             document['url'] = metadata['url']
             document['parent_url'] = metadata['parent_url']
             document['filename'] = document['url'].split('/')[-1]
-
-        # document title
-        if get_title_from_meta(pdfpath) == None: document['title'] = get_title_without_meta(pdfpath)
-        else: document['title'] = get_title_from_meta(pdfpath)
-        if document['title'] == None: return
 
         # document classification
         generated_url_features = pd.DataFrame(columns=url_features)
