@@ -26,3 +26,8 @@ Supported file types
 - .wav via SpeechRecognition and pocketsphinx
 - .xlsx via xlrd
 - .xls via xlrd
+
+# brew Dependencies
+- Swig etc. for Textract: https://textract.readthedocs.io/en/stable/installation.html
+- Ghostscript: https://wiki.scribus.net/canvas/Installation_and_Configuration_of_Ghostscript
+- ImageMagick 6: https://github.com/ImageMagick/ImageMagick/issues/953
