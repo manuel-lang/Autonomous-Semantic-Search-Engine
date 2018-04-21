@@ -13,6 +13,7 @@ import PyPDF2
 import re
 import sys
 import textract
+import tldextract
 
 from collections import Counter
 from nltk import pos_tag
@@ -33,7 +34,6 @@ from sklearn.base import BaseEstimator
 from wand.image import Image
 from watson_developer_cloud import NaturalLanguageUnderstandingV1
 from watson_developer_cloud.natural_language_understanding_v1 import Features, KeywordsOptions, EntitiesOptions
-
 
 def words(text): return re.findall(r'\w+', text.lower())
 
@@ -127,11 +127,6 @@ class LinguisticVectorizer(BaseEstimator):
             return len(hapaxes)
         return len(hapaxes) / len(words)
 
-    def _get_number_of_spelling_mistakes(self, string):
-        text_vocub = set(w.lower() for w in word_tokenize(string) if w.isalpha())
-        text_dict  = set(w.lower() for w in dictionary)
-        return len(text_vocub - text_dict) / self._get_text_length(string)
-
     def _get_number_of_currency_symbols(self, string):
         currencies = ["£","€","$","¥","¢","₩"]
         sum = 0
@@ -171,18 +166,14 @@ class LinguisticVectorizer(BaseEstimator):
     def transform(self, documents):
         text_length = [self._get_text_length(d) for d in documents]
         number_of_paragraphs = [self._get_number_of_paragraphs(d) for d in documents]
-        print("---1")
         average_length_of_sent = [self._get_average_sent_length(d) for d in documents]
         average_word_length = [self._get_average_word_length(d) for d in documents]
-        print("---2")
         number_of_nouns = [self._get_number_of_nouns(d) for d in documents]
         number_of_adjectives = [self._get_number_of_adjectives(d) for d in documents]
         number_of_verbs = [self._get_number_of_verbs(d) for d in documents]
-        print("---3")
         type_token_relation = [self._get_ttr(d) for d in documents]
         hapaxes_index = [self._get_hl(d) for d in documents]
         action_index = [self._get_naq(d) for d in documents]
-        print("---4")
         number_of_question_marks = [self._get_number_of_symbol(d, "?") for d in documents]
         number_of_exclamations = [self._get_number_of_symbol(d, "!") for d in documents]
         number_of_percentages = [self._get_number_of_symbol(d, "%") for d in documents]
@@ -399,10 +390,11 @@ def mongo_save(document, schema):
          "extracted_image_paths": document['pdf_images_paths'],
          "document_url": document['url'],
          "document_parent_url": document['parent_url'],
-         "document_type": "paper",
+         "document_type": document['document_type'],
          "filename": "Hyper dyper AI paper",
          "keywords": document['keywords'], # word, score
          "entities": document['entities'], # entity, value, score, image
+         "word2vec": document['vector_representation'],
          "date": datetime.datetime.now()}
     schema.insert_one(doc)
 
@@ -454,20 +446,27 @@ def main(entity_limit = 50, keyword_limit = 20):
         if document['title'] == None: return
 
         # document classification
-        #x = []
-        #try:
-        #    x.append({
-        #        "tld-url": '.'.join(tldextract.extract(document['url'])[:2]),
-        #        "tld-parent-url": '.'.join(tldextract.extract(document['parent_url'])[:2])
-        #    })
-        #except Exception as e:
-        #    print(str(e))
-        #    pass
+        generated_url_features = pd.DataFrame(columns=url_features)
+        generated_url_features.loc[0] = np.zeros(len(url_features))
+        url_feature = "tld-url" + "_" + '.'.join(tldextract.extract(document['url'])[:2])
+        parent_url_feature = "tld-parent-url" + "_" + '.'.join(tldextract.extract(document['parent_url'])[:2])
+        if url_feature in generated_url_features.columns:
+            generated_url_features.loc[0][url_feature] = 1
+        if parent_url_feature in generated_url_features.columns:
+            generated_url_features.loc[0][parent_url_feature] = 1
 
-        #ling = LinguisticVectorizer();
-        #x_ling = ling.fit([document['text']]).transform([document['text']])
-        #url_features = pd.get_dummies(pd.DataFrame(x))
-        #url_features.head()
+        ling = LinguisticVectorizer()
+        x_ling = ling.fit([document['text']]).transform([document['text']])
+        ling_features = pd.DataFrame(x_ling, columns=ling.get_feature_names())
+
+        model = api.load("glove-wiki-gigaword-300")  # download the model and return as object ready for use
+
+        w2v_features = pd.DataFrame([np.array(getVectorsOf(model, document["text"])).mean(axis=0)]).add_prefix("w2v_")
+        features = pd.concat([generated_url_features, ling_features, w2v_features], axis=1)
+
+        prediction = document_type_classifier.predict(features)
+
+        document["document_type"] = prediction[0]
 
         # document images
         outpath = os.path.join("out", str(index))
