@@ -402,7 +402,7 @@ def mongo_save(document, schema):
          "entities": document['entities'], # entity, value, score, image
          "word2vec": document['vector_representation'],
          "lingvector" : document['lingvector'],
-         "date": datetime.datetime.now()}
+         "date": document['time']}
     schema.insert_one(doc)
 
 def main(entity_limit = 50, keyword_limit = 20):
@@ -412,9 +412,10 @@ def main(entity_limit = 50, keyword_limit = 20):
     with open('../notebooks/url_features.pkl', 'rb') as f:
         url_features = pickle.load(f)
     for index, pdffile in enumerate(os.listdir('nextiterationhackathon2018/pdf')):
-        if(pdffile.endswith(".json")): break
+        if(pdffile.endswith(".json")): continue
         pdfpath = os.path.join('nextiterationhackathon2018/pdf', pdffile)
         document = {}
+        document['time'] = os.path.getmtime(pdfpath)
         # process raw text
         document['text'] = textract.process("nextiterationhackathon2018/pdf/Waechter2018.pdf").decode("utf-8")
 
@@ -446,6 +447,7 @@ def main(entity_limit = 50, keyword_limit = 20):
             metadata = json.load(jsondata)
             document['url'] = metadata['url']
             document['parent_url'] = metadata['parent_url']
+            document['filename'] = document['url'].split('/')[-1]
 
         # document title
         if get_title_from_meta(pdfpath) == None: document['title'] = get_title_without_meta(pdfpath)
