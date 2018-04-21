@@ -12,6 +12,8 @@ name = "pypi"
 [packages]
 
 jupyter = "*"
+watson-developer-cloud = "*"
+textract = "*"
 
 
 [requires]
