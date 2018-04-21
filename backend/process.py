@@ -401,9 +401,12 @@ def main(entity_limit = 50, keyword_limit = 20):
         password='Prop61GOuNtl',
         version='2018-03-16')
 
-    for index, pdffile in enumerate(sorted(os.listdir('nextiterationhackathon2018/pdf'))):
+    start = 2000
+    end = 3000
+
+    for index, pdffile in enumerate(sorted(os.listdir('nextiterationhackathon2018/pdf'))[start:end]):
         try:
-            print("Durchlauf " + str(index))
+            print("Durchlauf " + str(start) + "/" + str(start+index) + "/" + str(end))
             if(pdffile.endswith(".json")):
                 print("JSON found :(")
                 continue
