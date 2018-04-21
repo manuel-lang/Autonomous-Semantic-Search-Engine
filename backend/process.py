@@ -12,6 +12,7 @@ import pickle
 import PyPDF2
 import re
 import sys
+import pdfrw
 import textract
 import tldextract
 
@@ -359,6 +360,7 @@ def create_thumbnail(src_filename, output_path, pagenum = 0, resolution = 72,):
     pdf_bytes.seek(0)
     img = Image(file = pdf_bytes, resolution = resolution)
     img.convert("png")
+    print(output_path)
     export_path = output_path + "_thumb.png"
     img.save(filename = export_path)
     return export_path
@@ -405,83 +407,101 @@ def main(entity_limit = 50, keyword_limit = 20):
         document_type_classifier = pickle.load(f)
     with open('../notebooks/url_features.pkl', 'rb') as f:
         url_features = pickle.load(f)
-    for index, pdffile in enumerate(os.listdir('nextiterationhackathon2018/pdf')):
-        if(pdffile.endswith(".json")): continue
+    for index, pdffile in enumerate(sorted(os.listdir('nextiterationhackathon2018/pdf'))):
+        try:
+            print("Durchlauf " + str(index))
+            if(pdffile.endswith(".json")):
+                print("JSON found :(")
+                continue
 
-        pdfpath = os.path.join('nextiterationhackathon2018/pdf', pdffile)
-        document = {}
+            pdfpath = os.path.join('nextiterationhackathon2018/pdf', pdffile)
+            document = {}
 
-        # document title
-        if get_title_from_meta(pdfpath) == None: document['title'] = get_title_without_meta(pdfpath)
-        else: document['title'] = get_title_from_meta(pdfpath)
-        if document['title'] == None:
-            print("Could not find title")
+            # document title
+            try:
+                if get_title_from_meta(pdfpath) == None: document['title'] = get_title_without_meta(pdfpath)
+                else: document['title'] = get_title_from_meta(pdfpath)
+                if document['title'] == None:
+                    print("Could not find title")
+                    continue
+            except pdfrw.errors.PdfParseError as e:
+                print("PdfParseError")
+                continue
+            document['time'] = os.path.getmtime(pdfpath)
+            # process raw text
+            try:
+                document['text'] = textract.process(pdfpath).decode("utf-8")
+            except UnicodeDecodeError:
+                print("UnicodeDecodeError")
+                continue
+
+
+            #process entities and keywords
+            natural_language_understanding = NaturalLanguageUnderstandingV1(
+              username='cccb5076-87bd-4992-b99e-29a0f258460b',
+              password='Prop61GOuNtl',
+              version='2018-03-16')
+
+            response = natural_language_understanding.analyze(
+            text=document['text'],
+            features=Features(
+                entities=EntitiesOptions(
+                 sentiment=False,
+                 limit=entity_limit),
+                keywords=KeywordsOptions(
+                  sentiment=False,
+                  emotion=False,
+                  limit=keyword_limit)))
+
+            keywords = response['keywords']
+            document['keywords'] = process_keywords(keywords)
+            entities = response['entities']
+            document['entities'] = process_entities(entities)
+
+            # add metadata
+            json_path = os.path.join('nextiterationhackathon2018/pdf', basename(pdffile) + '.json')
+            with open(json_path, 'r+') as jsondata:
+                metadata = json.load(jsondata)
+                document['url'] = metadata['url']
+                document['parent_url'] = metadata['parent_url']
+                document['filename'] = document['url'].split('/')[-1]
+
+            # document classification
+            generated_url_features = pd.DataFrame(columns=url_features)
+            generated_url_features.loc[0] = np.zeros(len(url_features))
+            url_feature = "tld-url" + "_" + '.'.join(tldextract.extract(document['url'])[:2])
+            parent_url_feature = "tld-parent-url" + "_" + '.'.join(tldextract.extract(document['parent_url'])[:2])
+            if url_feature in generated_url_features.columns:
+                generated_url_features.loc[0][url_feature] = 1
+            if parent_url_feature in generated_url_features.columns:
+                generated_url_features.loc[0][parent_url_feature] = 1
+
+            ling = LinguisticVectorizer()
+            x_ling = ling.fit([document['text']]).transform([document['text']])
+            document['lingvector'] = x_ling[0]
+            ling_features = pd.DataFrame(x_ling, columns=ling.get_feature_names())
+
+            model = api.load("glove-wiki-gigaword-300")  # download the model and return as object ready for use
+
+            w2v_features = pd.DataFrame([np.array(getVectorsOf(model, document["text"])).mean(axis=0)]).add_prefix("w2v_")
+            features = pd.concat([generated_url_features, ling_features, w2v_features], axis=1)
+
+            prediction = document_type_classifier.predict(features)
+
+            document["document_type"] = prediction[0]
+
+            outpath = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "out", str(index))
+            os.makedirs(outpath, exist_ok=True)
+
+            # document images
+            document['pdf_images_paths'] = create_pdf_images(pdfpath, os.path.join(outpath, "docimages"))
+            document['thumbnail_path'] = create_thumbnail(pdfpath, os.path.join(outpath, "thumbnail"))
+            document['vector_representation'] = vectorize_document(document['text'])
+            document['summary'] = summarize(document['text'].replace('\n', ' '), word_count=100, split=False)
+            mongo_save(document, schema)
+        except Exception as e:
+            print("EXCEPTION" + str(e))
             continue
-        document['time'] = os.path.getmtime(pdfpath)
-        # process raw text
-        document['text'] = textract.process("nextiterationhackathon2018/pdf/Waechter2018.pdf").decode("utf-8")
-
-        #process entities and keywords
-        natural_language_understanding = NaturalLanguageUnderstandingV1(
-          username='cccb5076-87bd-4992-b99e-29a0f258460b',
-          password='Prop61GOuNtl',
-          version='2018-03-16')
-
-        response = natural_language_understanding.analyze(
-        text=document['text'],
-        features=Features(
-            entities=EntitiesOptions(
-             sentiment=False,
-             limit=entity_limit),
-            keywords=KeywordsOptions(
-              sentiment=False,
-              emotion=False,
-              limit=keyword_limit)))
-
-        keywords = response['keywords']
-        document['keywords'] = process_keywords(keywords)
-        entities = response['entities']
-        document['entities'] = process_entities(entities)
-
-        # add metadata
-        json_path = os.path.join('nextiterationhackathon2018/pdf', basename(pdffile) + '.json')
-        with open(json_path, 'r+') as jsondata:
-            metadata = json.load(jsondata)
-            document['url'] = metadata['url']
-            document['parent_url'] = metadata['parent_url']
-            document['filename'] = document['url'].split('/')[-1]
-
-        # document classification
-        generated_url_features = pd.DataFrame(columns=url_features)
-        generated_url_features.loc[0] = np.zeros(len(url_features))
-        url_feature = "tld-url" + "_" + '.'.join(tldextract.extract(document['url'])[:2])
-        parent_url_feature = "tld-parent-url" + "_" + '.'.join(tldextract.extract(document['parent_url'])[:2])
-        if url_feature in generated_url_features.columns:
-            generated_url_features.loc[0][url_feature] = 1
-        if parent_url_feature in generated_url_features.columns:
-            generated_url_features.loc[0][parent_url_feature] = 1
-
-        ling = LinguisticVectorizer()
-        x_ling = ling.fit([document['text']]).transform([document['text']])
-        document['lingvector'] = x_ling[0]
-        ling_features = pd.DataFrame(x_ling, columns=ling.get_feature_names())
-
-        model = api.load("glove-wiki-gigaword-300")  # download the model and return as object ready for use
-
-        w2v_features = pd.DataFrame([np.array(getVectorsOf(model, document["text"])).mean(axis=0)]).add_prefix("w2v_")
-        features = pd.concat([generated_url_features, ling_features, w2v_features], axis=1)
-
-        prediction = document_type_classifier.predict(features)
-
-        document["document_type"] = prediction[0]
-
-        # document images
-        outpath = os.path.join("out", str(index))
-        document['pdf_images_paths'] = create_pdf_images(pdfpath, os.path.join(outpath, "docimages"))
-        document['thumbnail_path'] = create_thumbnail(pdfpath, os.path.join(outpath, "thumbnail"))
-        document['vector_representation'] = vectorize_document(document['text'])
-        document['summary'] = summarize(document['text'].replace('\n', ' '), word_count=100, split=False)
-        mongo_save(document, schema)
 
 if __name__ == "__main__":
     main()
