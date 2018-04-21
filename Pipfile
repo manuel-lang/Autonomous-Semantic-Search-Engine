@@ -21,6 +21,9 @@ fitz = "*"
 wand = "*"
 "pdfminer.six" = "*"
 pdfrw = "*"
+scikit-learn = "*"
+tldextract = "*"
+matplotlib = "*"
 
 
 [requires]
