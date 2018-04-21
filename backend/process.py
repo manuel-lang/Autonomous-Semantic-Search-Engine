@@ -299,8 +299,7 @@ def get_title_without_meta(input_pdf):
     string_fontsize = parse_obj(layout._objs)
     title_index = max(range(len(string_fontsize)), key=lambda index: string_fontsize[index]['size'])
     title = string_fontsize[title_index]["string"].replace("\n", " ")
-    if len(title) <= 75: return title
-    return None
+    return title
 
 def create_pdf_images(input_pdf, output_path):
 
@@ -386,20 +385,24 @@ def mongo_connect():
     return documents
 
 def mongo_save(document, schema):
-    doc = {"document_title": document['title'],
+    doc = {"document_title_md": document['title_md'],
+           "document_title_pdf": document['title_pdf'],
+           "document_title_summ": summarize(document['text'], word_count=6, split=False),
+           "document_text": document["text"],
          "document_summary": document['summary'],
          "thumbnail_path": document['thumbnail_path'],
          "extracted_image_paths": document['pdf_images_paths'],
          "document_url": document['url'],
          "document_parent_url": document['parent_url'],
          "document_type": document['document_type'],
-         "filename": "Hyper dyper AI paper",
+         "filename": document["filename"],
          "keywords": document['keywords'], # word, score
          "entities": document['entities'], # entity, value, score, image
-         "word2vec": document['vector_representation'],
-         "lingvector" : document['lingvector'],
+         "word2vec": document['vector_representation'].tolist(),
+         "lingvector" : document['lingvector'].tolist(),
          "date": document['time']}
     schema.insert_one(doc)
+    print("SUCCESS :)))")
 
 def main(entity_limit = 50, keyword_limit = 20):
     schema = mongo_connect()
@@ -416,14 +419,11 @@ def main(entity_limit = 50, keyword_limit = 20):
 
             pdfpath = os.path.join('nextiterationhackathon2018/pdf', pdffile)
             document = {}
-
+            print("Titel start")
             # document title
             try:
-                if get_title_from_meta(pdfpath) == None: document['title'] = get_title_without_meta(pdfpath)
-                else: document['title'] = get_title_from_meta(pdfpath)
-                if document['title'] == None:
-                    print("Could not find title")
-                    continue
+                document['title_pdf'] = get_title_without_meta(pdfpath)
+                document['title_md'] = get_title_from_meta(pdfpath)
             except pdfrw.errors.PdfParseError as e:
                 print("PdfParseError")
                 continue
@@ -434,6 +434,8 @@ def main(entity_limit = 50, keyword_limit = 20):
             except UnicodeDecodeError:
                 print("UnicodeDecodeError")
                 continue
+
+            print("NLU start")
 
 
             #process entities and keywords
@@ -467,6 +469,9 @@ def main(entity_limit = 50, keyword_limit = 20):
                 document['filename'] = document['url'].split('/')[-1]
 
             # document classification
+
+            print("Classification start")
+
             generated_url_features = pd.DataFrame(columns=url_features)
             generated_url_features.loc[0] = np.zeros(len(url_features))
             url_feature = "tld-url" + "_" + '.'.join(tldextract.extract(document['url'])[:2])
@@ -490,14 +495,23 @@ def main(entity_limit = 50, keyword_limit = 20):
 
             document["document_type"] = prediction[0]
 
+            print("Images start")
+
             outpath = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "out", str(index))
             os.makedirs(outpath, exist_ok=True)
 
             # document images
             document['pdf_images_paths'] = create_pdf_images(pdfpath, os.path.join(outpath, "docimages"))
             document['thumbnail_path'] = create_thumbnail(pdfpath, os.path.join(outpath, "thumbnail"))
+
+            print("Vector start")
+
             document['vector_representation'] = vectorize_document(document['text'])
+
+            print("Summary start")
             document['summary'] = summarize(document['text'].replace('\n', ' '), word_count=100, split=False)
+
+            print("Save start")
             mongo_save(document, schema)
         except Exception as e:
             print("EXCEPTION" + str(e))
