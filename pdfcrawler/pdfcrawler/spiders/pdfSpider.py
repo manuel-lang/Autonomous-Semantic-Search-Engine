@@ -13,7 +13,9 @@ class PdfSpider(Spider):
         urls = [
             # 'http://h2t.anthropomatik.kit.edu/101.php',
             # 'http://h2t.anthropomatik.kit.edu/index.php'
-            'https://www.informatik.kit.edu/226.php'
+            # 'https://www.informatik.kit.edu/226.php'
+            'https://www.stanford.edu/list/academic/',
+            'https://cs.stanford.edu/'
         ]
         for url in urls:
             yield Request(url=url, callback=self.parse)
@@ -26,7 +28,7 @@ class PdfSpider(Spider):
                 url = str(urljoin(response.url, url))
                 if not url.startswith("javascript") \
                         and not url.startswith("mailto") \
-                        and ".kit.edu" in url:
+                        and ".stanford.edu" in url:
                     yield Request(url, callback=self.parse)
 
     def save_pdf(self, response):
