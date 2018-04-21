@@ -29,6 +29,7 @@ from pdfminer.pdfinterp import PDFPageInterpreter
 from pdfminer.pdfpage import PDFPage
 from pdfminer.pdfparser import PDFParser
 from pdfrw import PdfReader
+from PIL import Image
 from pymongo import MongoClient
 from sklearn.base import BaseEstimator
 from wand.image import Image
@@ -343,9 +344,14 @@ def create_pdf_images(input_pdf, output_path):
         with open(file_path, "wb") as jpgfile:
             jpgfile.write(jpg)
 
-        export_paths.append(file_path)
+        img = Image.open(file_path)
+        size = img.size
+        if size[0] < 100 or size[1] < 100:
+            os.remove(file_path)
+        else:
+            export_paths.append(file_path)
+            njpg += 1
 
-        njpg += 1
         i = iend
 
     return export_paths
@@ -395,6 +401,7 @@ def mongo_save(document, schema):
          "keywords": document['keywords'], # word, score
          "entities": document['entities'], # entity, value, score, image
          "word2vec": document['vector_representation'],
+         "lingvector" : document['lingvector'],
          "date": datetime.datetime.now()}
     schema.insert_one(doc)
 
@@ -457,6 +464,7 @@ def main(entity_limit = 50, keyword_limit = 20):
 
         ling = LinguisticVectorizer()
         x_ling = ling.fit([document['text']]).transform([document['text']])
+        document['lingvector'] = x_ling[0]
         ling_features = pd.DataFrame(x_ling, columns=ling.get_feature_names())
 
         model = api.load("glove-wiki-gigaword-300")  # download the model and return as object ready for use
