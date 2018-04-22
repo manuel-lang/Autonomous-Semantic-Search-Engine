@@ -124,12 +124,10 @@ def show_user_profile(query):
                 if entity['text'].lower() in [x[1].lower() for x in document['entities']]:
                     add = True
                     extra += 0.1
-                    out_values.append((document, cos_value))
             for keyword in response['keywords']:
                 if keyword["text"].lower() in [x[0].lower() for x in document['keywords']]:
                     add = True
                     extra += 0.1
-                    out_values.append((document, cos_value))
             if cos_value > upper_threshold:
                 add = True
             if (len(document["extracted_image_paths"]) > 0): extra += 0.15
