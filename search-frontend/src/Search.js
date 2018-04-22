@@ -16,24 +16,44 @@ class SearchInt extends Component {
 
             ],
             expandedCard: -1,
-            searchInput: ""
+            searchInput: "",
+            enityImages: {
+
+            }
         }
 
     }
 
     componentDidMount() {
-        this.reloadCards() 
+        const query = queryString.parse(this.props.location.search).q;
+        this.reloadCards(query) 
     }
 
-    reloadCards() {
-        const query = queryString.parse(this.props.location.search).q;
+    reloadCards(query) {
         this.setState({
             ...this.state,
+            cards: [],
             searchInput: query
         })
-        fetch("http://localhost:5000/" + query)
+        fetch("http://localhost:5000/search/" + query)
             .then(response => response.json())
-            .then(data => this.setState({ ...this.state, cards: data.cards }));
+            .then(data => {
+                this.setState({ ...this.state, cards: data.cards })
+                data.cards.forEach(card => {
+                   card.entities.forEach(entity => {
+                       fetch("http://localhost:5000/images/" + entity[1])
+                       .then(response => response.text())
+                       .then(data => {
+                           let imageUrl = data
+                           let newImages = {...this.state.enityImages}
+                           newImages[entity[1]] = imageUrl
+                           this.setState({
+                               ...this.state, enityImages: newImages
+                           })
+                       })
+                   })
+                });
+            });
     }
 
     render() {
@@ -46,7 +66,7 @@ class SearchInt extends Component {
                         <SearchBar
                             value={this.state.searchInput}
                             onChange={(value) => { this.setState({ searchInput: value }) }}
-                            onRequestSearch={() => {this.props.history.push('/search?q=' + this.state.searchInput); this.reloadCards()}}
+                            onRequestSearch={() => {this.props.history.push('/search?q=' + this.state.searchInput); this.reloadCards(this.state.searchInput)}}
                             style={{ width: "100%" }}
                         />
                     </div>
@@ -74,7 +94,7 @@ class SearchInt extends Component {
                                         card.tags.map(tag => (
                                             <Chip className="card-tag"
                                                 style={{ margin: "5px", fontSize: "100px", height: "27px" }}
-                                                onClick={() => {this.props.history.push('/search?q=' + tag); this.reloadCards()}}
+                                                onClick={() => {this.props.history.push('/search?q=' + tag); this.reloadCards(tag)}}
                                                 labelStyle={{ fontSize: "12px", lineHeight: "28px" }}>{tag}</Chip>
                                         ))
                                     }
@@ -85,11 +105,11 @@ class SearchInt extends Component {
                                             return (
                                                 <div class="card-entity">
                                                     <div class="card-entity-image-container">
-                                                        <img src={entity.image}
-                                                            onClick={() => {this.props.history.push('/search?q=' + entity.name); this.reloadCards()}}
+                                                        <img src={this.state.enityImages[entity[1]]}
+                                                            onClick={() => {this.props.history.push('/search?q=' + entity[1]); this.reloadCards(entity[1])}}
                                                             class="card-entity-image" />
                                                     </div>
-                                                    <div> {entity.name} </div>
+                                                    <div> {entity[1]} </div>
                                                 </div>
                                             )
                                         })
