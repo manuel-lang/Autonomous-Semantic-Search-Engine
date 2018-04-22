@@ -13,38 +13,7 @@ class SearchInt extends Component {
         super()
         this.state = {
             cards: [
-                {
-                    title: "Awesome Paper Title",
-                    type: "Paper",
-                    url: "http://bla.standford.edu/xyz/publications/awesome_paper.pdf",
-                    filename: "awesome_paper.pdf",
-                    tags: ["tag1", "longer tag2", "test tag", "really really long tag"],
-                    entities: [
-                        { name: "Hans Peter", type: "person", image: "http://linke-liste-konstanz.com/wp-content/uploads/2014/06/Hans-PeterKoch_color1.jpg" },
-                        { name: "Hans Peter", type: "person", image: "http://linke-liste-konstanz.com/wp-content/uploads/2014/06/Hans-PeterKoch_color1.jpg" },
-                        { name: "Hans Peter", type: "person", image: "http://linke-liste-konstanz.com/wp-content/uploads/2014/06/Hans-PeterKoch_color1.jpg" },
-                        { name: "Hans Peter", type: "person", image: "http://linke-liste-konstanz.com/wp-content/uploads/2014/06/Hans-PeterKoch_color1.jpg" },
-                        { name: "Hans Peter", type: "person", image: "http://linke-liste-konstanz.com/wp-content/uploads/2014/06/Hans-PeterKoch_color1.jpg" },
-                        { name: "Hans Peter", type: "person", image: "http://linke-liste-konstanz.com/wp-content/uploads/2014/06/Hans-PeterKoch_color1.jpg" },
-                        { name: "Hans Peter", type: "person", image: "http://linke-liste-konstanz.com/wp-content/uploads/2014/06/Hans-PeterKoch_color1.jpg" },
-                        {
-                            name: "Karlsruhe", type: "location", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Schloss_Karlsruhe_und_F%C3%A4cherstadt_2.jpg/300px-Schloss_Karlsruhe_und_F%C3%A4cherstadt_2.jpg"
-                        }],
-                    summary: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec mattis pretium massa. Aliquam erat volutpat. Nulla facilisi. Donec vulputate interdum sollicitudin. Nunc lacinia auctor quam sed pellentesque. Aliquam dui mauris, mattis quis lacus id, pellentesque lobortis odio."
-                },
-                {
-                    title: "Awesome Paper Title",
-                    type: "Paper",
-                    url: "http://bla.standford.edu/xyz/publications/awesome_paper.pdf",
-                    filename: "awesome_paper.pdf",
-                    tags: ["tag1", "longer tag2", "test tag", "really really long tag"],
-                    entities: [
-                        { name: "Hans Peter", type: "person", image: "http://linke-liste-konstanz.com/wp-content/uploads/2014/06/Hans-PeterKoch_color1.jpg" },
-                        {
-                            name: "Karlsruhe", type: "location", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Schloss_Karlsruhe_und_F%C3%A4cherstadt_2.jpg/300px-Schloss_Karlsruhe_und_F%C3%A4cherstadt_2.jpg"
-                        }],
-                    summary: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec mattis pretium massa. Aliquam erat volutpat. Nulla facilisi. Donec vulputate interdum sollicitudin. Nunc lacinia auctor quam sed pellentesque. Aliquam dui mauris, mattis quis lacus id, pellentesque lobortis odio."
-                }
+
             ],
             expandedCard: -1,
             searchInput: ""
@@ -59,9 +28,9 @@ class SearchInt extends Component {
             searchInput: query
         })
         console.log("test")
-        // fetch("")
-        //     .then(response => response.json())
-        //     .then(data => this.setState({ cards: data.cards }));
+         fetch("http://localhost:3000/"+query)
+             .then(response => response.json())
+             .then(data => this.setState({ ...this.state, cards: data.cards }));
     }
 
     render() {
