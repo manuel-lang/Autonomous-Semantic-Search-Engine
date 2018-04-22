@@ -3,6 +3,7 @@ import http.server
 import math
 import json
 import numpy as np
+import re
 import os
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from nltk.tokenize import sent_tokenize, word_tokenize, wordpunct_tokenize
@@ -117,14 +118,22 @@ def show_user_profile(query):
     for document in schema.find():
         cos_value = cosine_measure(document['word2vec'], query_vector)
         if cos_value > threshold:
+            add = False
+            extra = 0
             for entity in response['entities']:
                 if entity['text'].lower() in [x[1].lower() for x in document['entities']]:
+                    add = True
+                    extra += 0.1
                     out_values.append((document, cos_value))
             for keyword in response['keywords']:
-                if keyword["text"].lower() in [x[0].lower() for x in document['keywords']] and not (document, cos_value) in out_values:
+                if keyword["text"].lower() in [x[0].lower() for x in document['keywords']]:
+                    add = True
+                    extra += 0.1
                     out_values.append((document, cos_value))
-            if cos_value > upper_threshold and not (document, cos_value) in out_values:
-                out_values.append((document,cos_value))
+            if cos_value > upper_threshold:
+                add = True
+            if (len(document["extracted_image_paths"]) > 0): extra += 0.15
+            if(add): out_values.append((document, cos_value + extra))
 
     res = sorted(out_values, key=lambda x: x[1])
     res = [x for x in res
@@ -135,7 +144,7 @@ def show_user_profile(query):
 
     # Parse JSON
 
-    json_raw = {"cards":[]}
+    json_raw = {"cards": []}
 
     for card in res:
         if (card[0]["document_title_pdf"].isupper()):
@@ -151,8 +160,8 @@ def show_user_profile(query):
             "tags": [c[0].lower() for c in card[0]["keywords"][:5]],
             "entities": card[0]["entities"][:5],
             "summary": card[0]["document_summary"],
-            "thumbnail": card[0]["thumbnail_path"],
-            "images": card[0]["extracted_image_paths"],
+            "thumbnail": re.sub(r'.*/out', 'http://localhost:3002/', card[0]["thumbnail_path"]),
+            "images": [re.sub(r'.*/out', 'http://localhost:3002/', c) for c in card[0]["extracted_image_paths"]],
             "date": card[0]["date"],
             "lingvector": card[0]["lingvector"]
         })
