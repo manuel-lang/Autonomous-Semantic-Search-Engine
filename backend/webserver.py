@@ -3,11 +3,14 @@ import http.server
 import math
 import pprint
 import numpy as np
+import os
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from nltk.tokenize import sent_tokenize, word_tokenize, wordpunct_tokenize
 from pymongo import MongoClient
 from watson_developer_cloud import NaturalLanguageUnderstandingV1
 from watson_developer_cloud.natural_language_understanding_v1 import Features, KeywordsOptions, EntitiesOptions
+
+os.chdir(os.path.join(os.path.abspath(os.curdir),'out/0/'))
 
 def mongo_connect():
     client = MongoClient('localhost', 27017)
