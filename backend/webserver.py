@@ -3,6 +3,7 @@ import http.server
 import math
 import json
 import numpy as np
+import re
 import os
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from nltk.tokenize import sent_tokenize, word_tokenize, wordpunct_tokenize
@@ -115,8 +116,8 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
                 "tags": [c[0].lower() for c in card[0]["keywords"][:5]],
                 "entities": card[0]["entities"][:5],
                 "summary": card[0]["document_summary"],
-                "thumbnail": card[0]["thumbnail_path"],
-                "images": card[0]["extracted_image_paths"],
+                "thumbnail": re.sub(r'.*/out','http://localhost:3002/', card[0]["thumbnail_path"]),
+                "images": [re.sub(r'.*/out','http://localhost:3002/', c) for c in card[0]["extracted_image_paths"]],
                 "date": card[0]["date"],
                 "lingvector": card[0]["lingvector"]
             })

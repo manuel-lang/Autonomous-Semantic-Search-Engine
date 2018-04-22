@@ -22,15 +22,18 @@ class SearchInt extends Component {
     }
 
     componentDidMount() {
+        this.reloadCards() 
+    }
+
+    reloadCards() {
         const query = queryString.parse(this.props.location.search).q;
         this.setState({
             ...this.state,
             searchInput: query
         })
-        console.log("test")
-         fetch("http://localhost:3000/"+query)
-             .then(response => response.json())
-             .then(data => this.setState({ ...this.state, cards: data.cards }));
+        fetch("http://localhost:3000/" + query)
+            .then(response => response.json())
+            .then(data => this.setState({ ...this.state, cards: data.cards }));
     }
 
     render() {
@@ -43,7 +46,7 @@ class SearchInt extends Component {
                         <SearchBar
                             value={this.state.searchInput}
                             onChange={(value) => { this.setState({ searchInput: value }) }}
-                            onRequestSearch={() => this.props.history.push('/search?q=' + this.state.searchInput)}
+                            onRequestSearch={() => {this.props.history.push('/search?q=' + this.state.searchInput); this.reloadCards()}}
                             style={{ width: "100%" }}
                         />
                     </div>
@@ -70,7 +73,7 @@ class SearchInt extends Component {
                                         card.tags.map(tag => (
                                             <Chip className="card-tag"
                                                 style={{ margin: "5px", fontSize: "100px", height: "27px" }}
-                                                onClick={() => this.setState({...this.state, searchInput: tag})}
+                                                onClick={() => {this.props.history.push('/search?q=' + tag); this.reloadCards()}}
                                                 labelStyle={{ fontSize: "12px", lineHeight: "28px" }}>{tag}</Chip>
                                         ))
                                     }
@@ -82,7 +85,7 @@ class SearchInt extends Component {
                                                 <div class="card-entity">
                                                     <div class="card-entity-image-container">
                                                         <img src={entity.image}
-                                                            onClick={() => this.setState({...this.state, searchInput: entity.name})}
+                                                            onClick={() => {this.props.history.push('/search?q=' + entity.name); this.reloadCards()}}
                                                             class="card-entity-image" />
                                                     </div>
                                                     <div> {entity.name} </div>
