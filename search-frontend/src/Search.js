@@ -31,7 +31,7 @@ class SearchInt extends Component {
             ...this.state,
             searchInput: query
         })
-        fetch("http://localhost:3000/" + query)
+        fetch("http://localhost:5000/" + query)
             .then(response => response.json())
             .then(data => this.setState({ ...this.state, cards: data.cards }));
     }
@@ -54,7 +54,8 @@ class SearchInt extends Component {
                 {
                     cards.map((card, i) => (
                         <div class="search-content">
-                            <Card containerStyle={{ padding: "10px" }}>
+                            <Card containerStyle={{ padding: "10px 10px 20px 200px", "position":"relative" }}>
+                                <img class="search-thumbnail" src={card.thumbnail} />
                                 <div class="card-type">
                                     {card.type}
                                 </div>
@@ -94,10 +95,11 @@ class SearchInt extends Component {
                                         })
                                     }
                                 </div>
+                            </Card>
                                 <i class="card-expand-button fas fa-angle-double-down"
                                     onClick={() => this.setState({ expandedCard: this.state.expandedCard == i ? -1 : i })}
                                     style={this.state.expandedCard == i ? { transform: "rotate(180deg)" } : { transform: "rotate(0deg)" }}></i>
-                            </Card>
+
                         </div>
                     ))
                 }
