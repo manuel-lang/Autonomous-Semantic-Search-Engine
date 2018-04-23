@@ -1,33 +1,20 @@
-# NextIterationHackathon2018
+# Autonomous Semantic Search Engine
 
-## Textract
+A search engine that autonomously crawls documents from a given domain including their subdomains, analyzes them and renders them into a search frontend. This implementation demonstraits the functionality with [Stanford University](https://www.stanford.edu/) website.
 
-Supported file types
-- .csv via python builtins
-- .doc via antiword
-- .docx via python-docx2txt
-- .eml via python builtins
-- .epub via ebooklib
-- .gif via tesseract-ocr
-- .jpg and .jpeg via tesseract-ocr
-- .json via python builtins
-- .html and .htm via beautifulsoup4
-- .mp3 via sox, SpeechRecognition, and pocketsphinx
-- .msg via msg-extractor
-- .odt via python builtins
-- .ogg via sox, SpeechRecognition, and pocketsphinx
-- .pdf via pdftotext (default) or pdfminer.six
-- .png via tesseract-ocr
-- .pptx via python-pptx
-- .ps via ps2text
-- .rtf via unrtf
-- .tiff and .tif via tesseract-ocr
-- .txt via python builtins
-- .wav via SpeechRecognition and pocketsphinx
-- .xlsx via xlrd
-- .xls via xlrd
+## Web crawler
 
-# brew Dependencies
+Python implementation with Scrapy [here](https://github.com/manu183/Autonomous-Semantic-Search-Engine/tree/master/pdfcrawler).
+
+## Document analysis
+
+Python implementation using [Watson Natural Language Understanding](https://www.ibm.com/watson/services/natural-language-understanding/) and a custom random forest [here](https://github.com/manu183/Autonomous-Semantic-Search-Engine/blob/master/backend/process.py).
+
+## Web frontend
+
+A react frontend that displays the information with additional image information using [Bing Image Search](https://azure.microsoft.com/en-au/services/cognitive-services/bing-image-search-api/) [here](https://github.com/manu183/Autonomous-Semantic-Search-Engine/tree/master/search-frontend).
+
+## brew Dependencies
 - Swig etc. for Textract: https://textract.readthedocs.io/en/stable/installation.html
 - Ghostscript: https://wiki.scribus.net/canvas/Installation_and_Configuration_of_Ghostscript
 - ImageMagick 6: https://github.com/ImageMagick/ImageMagick/issues/953
