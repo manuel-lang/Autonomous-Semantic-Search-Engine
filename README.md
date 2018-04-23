@@ -1,6 +1,6 @@
 # Autonomous Semantic Search Engine
 
-A search engine that autonomously crawls documents from a given domain including their subdomains, analyzes them and renders them into a search frontend. This implementation demonstraits the functionality with [Stanford University](https://www.stanford.edu/) website.
+A search engine that autonomously crawls documents from a given domain including their subdomains, analyzes them and renders them into a search frontend. This implementation demonstrates the functionality with the [Stanford University](https://www.stanford.edu/)'s website. This project was implemented during the [Next Iteration Hackathon 2018](http://hackathon.nextiteration.de/)
 
 ## Web crawler
 
