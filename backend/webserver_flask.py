@@ -14,6 +14,8 @@ from flask import Flask, jsonify
 from datetime import timedelta
 from flask import make_response, request, current_app
 from functools import update_wrapper
+import requests
+
 app = Flask(__name__)
 
 def crossdomain(origin=None, methods=None, headers=None,
@@ -60,11 +62,23 @@ def crossdomain(origin=None, methods=None, headers=None,
 def mongo_connect():
     client = MongoClient('localhost', 27017)
     db = client.stanford_data
-    collection = db.document_collection
+    collection = db
     documents = collection.documents
     return documents
 
-@app.route('/<query>')
+@app.route('/images/<query>')
+@crossdomain(origin="*")
+def get_images(query):
+    headers = {"Ocp-Apim-Subscription-Key": "a3b8cfec4a154a0499681c75f01e0761"}
+    params = {"q": query, "count": 1}
+    response = requests.get("https://api.cognitive.microsoft.com/bing/v7.0/images/search",params=params, headers=headers)
+    response.raise_for_status()
+    search_results = response.json()
+    imageUrl = search_results["value"][0]["contentUrl"]
+    return imageUrl
+
+
+@app.route('/search/<query>')
 @crossdomain(origin='*')
 def show_user_profile(query):
     t = query.replace('%20',' ')
@@ -91,9 +105,11 @@ def show_user_profile(query):
     print(response)
 
     def cosine_measure(v1, v2):
+        v2=v2.astype("float64")
         prod = np.dot(v1, v2)
-        len1 = math.sqrt(np.dot(v1, v1))
-        len2 = math.sqrt(np.dot(v2, v2))
+        len1 = np.sqrt(np.dot(v1, v1))
+        # print(str(v2))
+        len2 = np.sqrt(np.dot(v2, v2))
         return prod / (len1 * len2)
 
     def getVectorsOf(model, text):
@@ -124,12 +140,10 @@ def show_user_profile(query):
                 if entity['text'].lower() in [x[1].lower() for x in document['entities']]:
                     add = True
                     extra += 0.1
-                    out_values.append((document, cos_value))
             for keyword in response['keywords']:
                 if keyword["text"].lower() in [x[0].lower() for x in document['keywords']]:
                     add = True
                     extra += 0.1
-                    out_values.append((document, cos_value))
             if cos_value > upper_threshold:
                 add = True
             if (len(document["extracted_image_paths"]) > 0): extra += 0.15
