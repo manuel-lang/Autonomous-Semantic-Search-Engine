@@ -8,7 +8,7 @@ Python implementation with Scrapy [here](https://github.com/manu183/Autonomous-S
 
 ## Document analysis
 
-Python implementation using [Watson Natural Language Understanding](https://www.ibm.com/watson/services/natural-language-understanding/) and a custom random forest [here](https://github.com/manu183/Autonomous-Semantic-Search-Engine/blob/master/backend/process.py).
+Python implementation using [Watson NLU](https://www.ibm.com/watson/services/natural-language-understanding/) (for Named Entities, Keywords), [gensim](https://radimrehurek.com/gensim/) (for Summarization and Semantic Representation) and a custom Document Type classifier (Random Forest, with [sklearn](http://scikit-learn.org/)). Title, a thumbnail and embedded images are also extracted from documents. See notebooks for specific implementations.
 
 ## Web frontend
 
